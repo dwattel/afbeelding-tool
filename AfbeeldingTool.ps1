@@ -1,5 +1,6 @@
 # Afbeelding & Media Tool (PowerShell - Uitgebreid & 100% veilig voor speciale tekens)
 $ErrorActionPreference = "Continue"
+Add-Type -AssemblyName PresentationCore
 
 $WorkDir = Get-Location
 $OutRoot = Join-Path $WorkDir "uitvoer"
@@ -108,27 +109,40 @@ while ($true) {
             $Ext = $File.Extension.ToLower()
             $File.IsReadOnly = $false
 
-            # A. Bestaande JPG-bestanden
+            # A. Bestaande JPG-bestanden (afmetingen direct via Windows .NET uitlezen)
             if ($Ext -eq '.jpg') {
                 try {
                     if (-not (Test-Path -LiteralPath $TargetDir)) {
                         New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
                     }
-                    $DimOutput = (& magick identify -ping -format "%w %h`n" -- "$($File.FullName)" 2>&1 | Where-Object { $_ -is [string] } | Select-Object -First 1)
-                    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($DimOutput)) {
+
+                    $W = 0
+                    $H = 0
+                    $Stream = [System.IO.File]::OpenRead($File.FullName)
+                    try {
+                        $Decoder = [System.Windows.Media.Imaging.BitmapDecoder]::Create(
+                            $Stream,
+                            [System.Windows.Media.Imaging.BitmapCreateOptions]::DelayCreation,
+                            [System.Windows.Media.Imaging.BitmapCacheOption]::None
+                        )
+                        $W = $Decoder.Frames.PixelWidth
+                        $H = $Decoder.Frames.PixelHeight
+                    } finally {
+                        $Stream.Close()
+                        $Stream.Dispose()
+                    }
+
+                    if ($W -le 0 -or $H -le 0) {
                         Write-ErrLog "[FOUT] Kan afmetingen niet lezen (beschadigd/ongeldig): $RelPath\$($File.Name)"
                         continue
                     }
-                    $Parts = $DimOutput.Trim().Split(' ')
-                    $W = [int]$Parts[0]
-                    $H = [int]$Parts[1]
 
                     if ($W -le 2560 -and $H -le 1440) {
                         $DestFile = Join-Path $TargetDir $File.Name
                         Move-Item -LiteralPath $File.FullName -Destination $DestFile -Force
                     } else {
                         $DestFile = Join-Path $TargetDir ($File.BaseName + ".jpg")
-                        & magick "$($File.FullName)[0]" -background white -alpha remove -fuzz 25% -trim +repage -resize "2560x1440>" "$DestFile" 2>$null
+                        & magick "$($File.FullName)" -background white -alpha remove -fuzz 25% -trim +repage -resize "2560x1440>" "$DestFile" 2>$null
                         if ($LASTEXITCODE -eq 0) {
                             Remove-Item -LiteralPath $File.FullName -Force
                         } else {
@@ -146,7 +160,7 @@ while ($true) {
                         New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
                     }
                     $DestFile = Join-Path $TargetDir ($File.BaseName + ".jpg")
-                    & magick "$($File.FullName)[0]" -background white -alpha remove -fuzz 25% -trim +repage -resize "2560x1440>" "$DestFile" 2>$null
+                    & magick "$($File.FullName)" -background white -alpha remove -fuzz 25% -trim +repage -resize "2560x1440>" "$DestFile" 2>$null
                     if ($LASTEXITCODE -eq 0) {
                         Remove-Item -LiteralPath $File.FullName -Force
                     } else {
@@ -196,7 +210,3 @@ while ($true) {
         Write-Host "Bekijk het overzicht hierboven of open: $LogFile"
     }
 
-    Write-Host "`nDruk op een willekeurige toets om terug te keren naar het menu, of op [ESC] om te stoppen..." -ForegroundColor Cyan
-    $key = [Console]::ReadKey($true).Key
-    if ($key -eq 'Escape') { exit }
-}
