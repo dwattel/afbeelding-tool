@@ -1,5 +1,5 @@
 # Afbeelding & Media Tool (PowerShell - Uitgebreid & 100% veilig voor speciale tekens)
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 $WorkDir = Get-Location
 $OutRoot = Join-Path $WorkDir "uitvoer"
@@ -114,7 +114,7 @@ while ($true) {
                     if (-not (Test-Path -LiteralPath $TargetDir)) {
                         New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
                     }
-                    $DimOutput = (& magick identify -format "%w %h`n" "$($File.FullName)[0]" 2>$null | Select-Object -First 1)
+                    $DimOutput = (& magick identify -ping -format "%w %h`n" -- "$($File.FullName)" 2>&1 | Where-Object { $_ -is [string] } | Select-Object -First 1)
                     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($DimOutput)) {
                         Write-ErrLog "[FOUT] Kan afmetingen niet lezen (beschadigd/ongeldig): $RelPath\$($File.Name)"
                         continue
