@@ -204,10 +204,17 @@ while ($true) {
     Write-Host ""
     if ($ErrorCount -eq 0) {
         Write-Host "[KLAAR] Alles is 100% foutloos verwerkt en opgeruimd naar: $OutRoot" -ForegroundColor Green
+        # 1 vriendelijke, heldere piep (800 Hz, 300 ms)
+        [Console]::Beep(800, 300)
     } else {
         Write-Host "[KLAAR MET $ErrorCount FOUTMELDING(EN)]" -ForegroundColor Red
         Write-Host "De betreffende bestanden en mappen zijn BEHOUDEN in de bronmap."
         Write-Host "Bekijk het overzicht hierboven of open: $LogFile"
+        # 3 korte waarschuwingspiepjes achter elkaar (400 Hz, 200 ms)
+        for ($b = 1; $b -le 3; $b++) {
+            [Console]::Beep(400, 200)
+            Start-Sleep -Milliseconds 100
+        }
     }
 
     Write-Host "`nDruk op een willekeurige toets om terug te keren naar het menu, of op [ESC] om te stoppen..." -ForegroundColor Cyan
