@@ -209,7 +209,6 @@ while ($true) {
         Write-Host "De betreffende bestanden en mappen zijn BEHOUDEN in de bronmap."
         Write-Host "Bekijk het overzicht hierboven of open: $LogFile"
     }
-    }
 
     Write-Host "`nDruk op een willekeurige toets om terug te keren naar het menu, of op [ESC] om te stoppen..." -ForegroundColor Cyan
     $key = [Console]::ReadKey($true).Key
