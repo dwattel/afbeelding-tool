@@ -1,4 +1,4 @@
-# Afbeelding & Media Tool (PowerShell - Uitgebreid & 100% veilig voor speciale tekens)
+# Afbeelding & Media Tool (PowerShell - Met Voortgangsbalk, Geluid & 100% veilig voor speciale tekens)
 $ErrorActionPreference = "Continue"
 Add-Type -AssemblyName PresentationCore
 
@@ -43,17 +43,24 @@ while ($true) {
         Add-Content -LiteralPath $LogFile -Value $Message
     }
 
-    Write-Host "Verwerking gestart... (Alleen foutmeldingen verschijnen hier en in foutenlog.txt)`n"
+    Write-Host "Bestanden inventariseren... (Alleen foutmeldingen verschijnen hieronder)`n"
 
-    $SubFolders = Get-ChildItem -LiteralPath $WorkDir -Directory -Recurse | Where-Object {
+    $SubFolders = @(Get-ChildItem -LiteralPath $WorkDir -Directory -Recurse | Where-Object {
         $_.FullName -notlike "$OutRoot*"
-    }
+    })
 
     if ($SubFolders.Count -eq 0) {
         Write-ErrLog "[FOUT] Geen submappen gevonden om te verwerken!"
         Read-Host "Druk op Enter om terug te keren"
         continue
     }
+
+    # Tel vooraf alle bestanden in de submappen voor een nauwkeurige voortgangsbalk
+    $AllFilesCount = @(Get-ChildItem -LiteralPath $WorkDir -File -Recurse | Where-Object {
+        $_.DirectoryName -notlike "$OutRoot*" -and $_.DirectoryName -ne $WorkDir.Path
+    }).Count
+    if ($AllFilesCount -lt 1) { $AllFilesCount = 1 }
+    $ProcessedCount = 0
 
     $ImageExts = @('.jpeg', '.png', '.webp', '.tif', '.tiff', '.psd', '.bmp', '.gif', '.heic', '.heif', '.avif', '.ico', '.svg', '.tga')
     $VideoExts = @('.mp4', '.mov', '.avi', '.mkv', '.wmv', '.webm', '.m4v', '.flv', '.3gp', '.mpg', '.mpeg', '.ts', '.vob', '.ogv')
@@ -69,6 +76,9 @@ while ($true) {
         $Files = Get-ChildItem -LiteralPath $Folder.FullName -File
         foreach ($File in $Files) {
             if ($JunkExts -contains $File.Extension.ToLower()) {
+                $ProcessedCount++
+                $Pct = [math]::Min(100, [int](($ProcessedCount / $AllFilesCount) * 100))
+                Write-Progress -Activity "Afbeeldingen & media verwerken" -Status "Opschonen ($ProcessedCount / $AllFilesCount): $RelPath\$($File.Name)" -PercentComplete $Pct
                 try {
                     $File.IsReadOnly = $false
                     Remove-Item -LiteralPath $File.FullName -Force
@@ -106,6 +116,10 @@ while ($true) {
         # 3. Media verwerken
         $Files = Get-ChildItem -LiteralPath $Folder.FullName -File
         foreach ($File in $Files) {
+            $ProcessedCount++
+            $Pct = [math]::Min(100, [int](($ProcessedCount / $AllFilesCount) * 100))
+            Write-Progress -Activity "Afbeeldingen & media verwerken" -Status "Bestand $ProcessedCount van $AllFilesCount ($Pct%): $RelPath\$($File.Name)" -PercentComplete $Pct
+
             $Ext = $File.Extension.ToLower()
             $File.IsReadOnly = $false
 
@@ -186,6 +200,7 @@ while ($true) {
     }
 
     # 4. Alleen volledig lege bronmappen opruimen (van diep naar ondiep)
+    Write-Progress -Activity "Afbeeldingen & media verwerken" -Status "Lege bronmappen opruimen..." -PercentComplete 100
     $AllDirsDesc = Get-ChildItem -LiteralPath $WorkDir -Directory -Recurse | Where-Object {
         $_.FullName -notlike "$OutRoot*"
     } | Sort-Object { $_.FullName.Length } -Descending
@@ -200,6 +215,9 @@ while ($true) {
             }
         }
     }
+
+    # Sluit de voortgangsbalk netjes af
+    Write-Progress -Activity "Afbeeldingen & media verwerken" -Completed
 
     Write-Host ""
     if ($ErrorCount -eq 0) {
