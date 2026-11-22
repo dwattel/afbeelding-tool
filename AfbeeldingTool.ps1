@@ -37,7 +37,6 @@ while ($true) {
 
     Write-Host "Verwerking gestart... (Alleen foutmeldingen verschijnen hier en in foutenlog.txt)`n"
 
-    # Haal vooraf alle submappen op (exclusief \uitvoer)
     $SubFolders = Get-ChildItem -LiteralPath $WorkDir -Directory -Recurse | Where-Object {
         $_.FullName -notlike "$OutRoot*"
     }
@@ -71,18 +70,11 @@ while ($true) {
             }
         }
 
-        # 2. Bestandsnamen opschonen (%5B/%5D weg, %2F -> -, %20 -> spatie, %28/%29 -> haakjes, %26 -> &, %2C -> ,)
+        # 2. Bestandsnamen opschonen op 1 veilige regel zonder backticks
         $Files = Get-ChildItem -LiteralPath $Folder.FullName -File
         foreach ($File in $Files) {
             if ($File.Name -match '%5B|%5D|%2F|%20|%28|%29|%26|%2C') {
-                $CleanName = $File.Name `
-                    -ireplace '%5B|%5D', '' `
-                    -ireplace '%2F', '-' `
-                    -ireplace '%20', ' ' `
-                    -ireplace '%28', '(' `
-                    -ireplace '%29', ')' `
-                    -ireplace '%26', '&' `
-                    -ireplace '%2C', ','
+                $CleanName = ((((((($File.Name -ireplace '%5B|%5D', '') -ireplace '%2F', '-') -ireplace '%20', ' ') -ireplace '%28', '(') -ireplace '%29', ')') -ireplace '%26', '&') -ireplace '%2C', ',')
 
                 if ($CleanName -ne $File.Name) {
                     try {
@@ -109,7 +101,7 @@ while ($true) {
             $Ext = $File.Extension.ToLower()
             $File.IsReadOnly = $false
 
-            # A. Bestaande JPG-bestanden (afmetingen direct via Windows .NET uitlezen)
+            # A. Bestaande JPG-bestanden
             if ($Ext -eq '.jpg') {
                 try {
                     if (-not (Test-Path -LiteralPath $TargetDir)) {
@@ -214,4 +206,3 @@ while ($true) {
     $key = [Console]::ReadKey($true).Key
     if ($key -eq 'Escape') { exit }
 }
-
