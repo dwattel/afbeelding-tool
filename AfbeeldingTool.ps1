@@ -125,8 +125,8 @@ while ($true) {
                             [System.Windows.Media.Imaging.BitmapCreateOptions]::DelayCreation,
                             [System.Windows.Media.Imaging.BitmapCacheOption]::None
                         )
-                        $W = $Decoder.Frames.PixelWidth
-                        $H = $Decoder.Frames.PixelHeight
+                        $W = $Decoder.Frames[0].PixelWidth
+                        $H = $Decoder.Frames[0].PixelHeight
                     } finally {
                         $Stream.Close()
                         $Stream.Dispose()
