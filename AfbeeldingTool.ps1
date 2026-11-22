@@ -6,6 +6,14 @@ $WorkDir = Get-Location
 $OutRoot = Join-Path $WorkDir "uitvoer"
 $LogFile = Join-Path $WorkDir "foutenlog.txt"
 
+# Veiligheidscheck: blokkeer systeem- en programmamappen zodat je nooit per ongeluk Windows of Program Files scant
+if ($WorkDir.Path -match '^([A-Za-z]:\\$|C:\\Windows|C:\\Program Files|C:\\Users\\[^\\]+$)') {
+    Write-Host "[VEILIGHEIDSBLOKKADE] Je staat in een systeem- of hoofdmap: $WorkDir" -ForegroundColor Red
+    Write-Host "Ga eerst naar je afbeeldingenmap (bijv. cd E:\afbtemp\convert) en start het script opnieuw." -ForegroundColor Yellow
+    Read-Host "Druk op Enter om af te sluiten"
+    exit
+}
+
 while ($true) {
     Clear-Host
     Write-Host "Huidige werkmap: $WorkDir" -ForegroundColor Yellow
