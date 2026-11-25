@@ -1,4 +1,4 @@
-# Afbeelding & Media Tool (PowerShell - Met Voortgangsbalk, Geluid & 100% veilig voor speciale tekens)
+# Afbeelding & Media Tool (PowerShell - Volledige Controle, Voortgangsbalk & Geluid)
 $ErrorActionPreference = "Continue"
 Add-Type -AssemblyName PresentationCore
 
@@ -23,7 +23,7 @@ while ($true) {
     Write-Host "Wat doet dit script in ALLE submappen:"
     Write-Host " 1. Verwijdert .txt, .url en .bat bestanden"
     Write-Host " 2. Schoont bestandsnamen op (%5B/%5D weg, %2F -> -, %20 -> spatie, %28/%29 -> haakjes)"
-    Write-Host " 3. JPG <= 2560x1440: Direct verplaatsen (100% originele kwaliteit)"
+    Write-Host " 3. JPG <= 2560x1440: Volledige corruptiecontrole + direct verplaatsen (100% originele kwaliteit)"
     Write-Host " 4. JPG >  2560x1440: Trimmen + schalen naar max 2560x1440 in uitvoer\..."
     Write-Host " 5. Overige afbeeldingen (png, webp, heic, avif, bmp, tif, psd, gif, jpeg, etc.): -> JPG"
     Write-Host " 6. Video's (mp4, mov, avi, mkv, wmv, webm, m4v, flv, mpg, ts, 3gp, etc.): Direct verplaatsen"
@@ -123,7 +123,7 @@ while ($true) {
             $Ext = $File.Extension.ToLower()
             $File.IsReadOnly = $false
 
-            # A. Bestaande JPG-bestanden
+            # A. Bestaande JPG-bestanden met volledige integriteitscontrole
             if ($Ext -eq '.jpg') {
                 try {
                     if (-not (Test-Path -LiteralPath $TargetDir)) {
@@ -136,11 +136,18 @@ while ($true) {
                     try {
                         $Decoder = [System.Windows.Media.Imaging.BitmapDecoder]::Create(
                             $Stream,
-                            [System.Windows.Media.Imaging.BitmapCreateOptions]::DelayCreation,
-                            [System.Windows.Media.Imaging.BitmapCacheOption]::None
+                            [System.Windows.Media.Imaging.BitmapCreateOptions]::None,
+                            [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
                         )
-                        $W = $Decoder.Frames[0].PixelWidth
-                        $H = $Decoder.Frames[0].PixelHeight
+                        $Frame = $Decoder.Frames[0]
+                        $W = $Frame.PixelWidth
+                        $H = $Frame.PixelHeight
+
+                        # Forceer volledige pixeldecodering om afgeknipte of corrupte data in het bestand te detecteren
+                        $Stride = $W * 4
+                        $Pixels = New-Object byte[] ($Stride * $H)
+                        $Frame.CopyPixels($Pixels, $Stride, 0)
+                        $Pixels = $null
                     } finally {
                         $Stream.Close()
                         $Stream.Dispose()
@@ -148,6 +155,13 @@ while ($true) {
 
                     if ($W -le 0 -or $H -le 0) {
                         Write-ErrLog "[FOUT] Kan afmetingen niet lezen (beschadigd/ongeldig): $RelPath\$($File.Name)"
+                        continue
+                    }
+
+                    # Extra strenge controle via ImageMagick identify (-regard-warnings vangt ook gedeeltelijk corrupte JPG's af)
+                    & magick identify -regard-warnings -- "$($File.FullName)" >$null 2>&1
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-ErrLog "[FOUT] Afbeelding is beschadigd of incompleet (overgeslagen): $RelPath\$($File.Name)"
                         continue
                     }
 
@@ -164,7 +178,7 @@ while ($true) {
                         }
                     }
                 } catch {
-                    Write-ErrLog "[FOUT] Fout bij verwerken JPG: $RelPath\$($File.Name) - $($_.Exception.Message)"
+                    Write-ErrLog "[FOUT] Beschadigde JPG gedetecteerd (overgeslagen): $RelPath\$($File.Name) - $($_.Exception.Message)"
                 }
             }
             # B. Overige afbeeldingsformaten
@@ -222,13 +236,11 @@ while ($true) {
     Write-Host ""
     if ($ErrorCount -eq 0) {
         Write-Host "[KLAAR] Alles is 100% foutloos verwerkt en opgeruimd naar: $OutRoot" -ForegroundColor Green
-        # 1 vriendelijke, heldere piep (800 Hz, 300 ms)
         [Console]::Beep(800, 300)
     } else {
         Write-Host "[KLAAR MET $ErrorCount FOUTMELDING(EN)]" -ForegroundColor Red
         Write-Host "De betreffende bestanden en mappen zijn BEHOUDEN in de bronmap."
         Write-Host "Bekijk het overzicht hierboven of open: $LogFile"
-        # 3 korte waarschuwingspiepjes achter elkaar (400 Hz, 200 ms)
         for ($b = 1; $b -le 3; $b++) {
             [Console]::Beep(400, 200)
             Start-Sleep -Milliseconds 100
